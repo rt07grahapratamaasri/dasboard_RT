@@ -10,7 +10,7 @@ import { AuthService } from '../../services/auth.service';
     <div class="layout">
       <aside class="sidebar glass-panel">
         <div class="sidebar-header flex justify-between items-center">
-          <h2 style="margin: 0;">Admin RT</h2>
+          <h2 style="margin: 0;">Admin RT GRAHA PRATAMA ASRI</h2>
           <button (click)="logout()" class="btn btn-sm btn-danger mobile-logout" style="display: none; padding: 0.4rem 0.8rem;">Logout</button>
         </div>
         
@@ -29,7 +29,7 @@ import { AuthService } from '../../services/auth.service';
 
       <main class="main-content">
         <header class="topbar glass-panel mb-4 items-center justify-between flex" style="flex-wrap: wrap; gap: 0.5rem;">
-          <h3 style="color: var(--text-dark); margin: 0; font-size: clamp(1.1rem, 3vw, 1.3rem);">Sistem Informasi</h3>
+          <h3 style="color: var(--text-dark); margin: 0; font-size: clamp(1.1rem, 3vw, 1.3rem);">SISTEM INFORMASI RT 07 GPA</h3>
           <div style="font-weight: 500; font-size: 0.9rem;">Halo, <span style="text-transform: capitalize;">{{ authService.getCurrentUsername() }}</span></div>
         </header>
         

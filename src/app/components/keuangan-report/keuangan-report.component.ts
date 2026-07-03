@@ -55,7 +55,7 @@ import Chart from 'chart.js/auto';
         </div>
 
         <div class="glass-panel animate-fade-in flex flex-col" style="padding: 1.5rem; animation-delay: 0.3s; max-height: 450px; overflow-y: auto;">
-          <h3 style="margin-bottom: 1rem;">5 Transaksi Terakhir</h3>
+          <h3 style="margin-bottom: 1rem;">Semua Transaksi (Bulan Ini)</h3>
           <div class="list-group">
             <div *ngFor="let t of recentTransactions" class="list-item flex justify-between items-center" style="padding: 1rem 0; border-bottom: 1px solid rgba(0,0,0,0.05); gap: 1rem;">
               <div style="flex: 1; min-width: 0;">
@@ -314,8 +314,7 @@ export class KeuanganReportComponent implements AfterViewInit {
     
     // Sort transactions by date descending (newest first)
     this.recentTransactions = [...data]
-      .sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime())
-      .slice(0, 5);
+      .sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
   }
 
   updateChart(data: any[]) {
