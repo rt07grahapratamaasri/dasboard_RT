@@ -101,10 +101,12 @@ import Chart from 'chart.js/auto';
         </div>
 
         <!-- Chart -->
-        <div class="glass-card flex flex-col items-center justify-center" style="padding: 1.5rem; margin-bottom: 2.5rem;">
-          <h4 style="margin-bottom: 1rem; color: var(--text-dark); font-size: 0.95rem;">Grafik Pembayaran</h4>
-          <div class="chart-container" style="max-width: 400px; margin: 0 auto;">
-            <canvas #iuranChartCanvas></canvas>
+        <div class="glass-card flex flex-col items-center justify-center" style="padding: 1rem; margin-bottom: 2.5rem; width: 100%; box-sizing: border-box;">
+          <h4 style="margin-bottom: 1rem; color: var(--text-dark); font-size: 0.95rem; text-align: center;">Grafik Pembayaran</h4>
+          <div style="width: 100%; display: flex; justify-content: center; align-items: center;">
+            <div class="chart-container" style="position: relative; width: 100%; max-width: 280px; height: 250px;">
+              <canvas #iuranChartCanvas></canvas>
+            </div>
           </div>
         </div>
 
