@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import * as XLSX from 'xlsx';
@@ -48,15 +48,64 @@ import { AuthService } from '../../services/auth.service';
 
         <!-- Keamanan Akun -->
         <div class="glass-card" style="padding: 1.5rem; border-top: 4px solid var(--danger);">
-          <h3 style="margin-bottom: 1rem;">Keamanan Akun</h3>
-          <p class="text-muted" style="margin-bottom: 1rem; font-size: 0.9rem;">Ubah nama pengguna (username) dan kata sandi (password) untuk login ke Panel Admin.</p>
+          <h3 style="margin-bottom: 1rem;">Manajemen Admin (Multi-User)</h3>
+          <p class="text-muted" style="margin-bottom: 1rem; font-size: 0.9rem;">Kelola daftar pengguna yang memiliki akses ke Panel Admin.</p>
           
-          <div class="flex flex-col gap-3">
-            <input type="text" class="form-control" placeholder="Username Baru" [(ngModel)]="newUsername">
-            <input type="password" class="form-control" placeholder="Password Baru" [(ngModel)]="newPassword">
-            <button (click)="changePassword()" class="btn btn-danger" style="width: 100%;">
-              🔒 Simpan Perubahan
-            </button>
+          <div class="table-responsive" style="margin-bottom: 1.5rem;">
+            <table class="table" style="font-size: 0.9rem;">
+              <thead>
+                <tr>
+                  <th>Username</th>
+                  <th>Password</th>
+                  <th>Hak Akses</th>
+                  <th style="width: 150px; text-align: center;">Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let u of users()">
+                  <td>
+                    <span *ngIf="editMode !== u.username">{{ u.username }}</span>
+                    <input *ngIf="editMode === u.username" type="text" class="form-control" [(ngModel)]="editUsername" style="padding: 0.3rem;">
+                  </td>
+                  <td>
+                    <span *ngIf="editMode !== u.username">••••••••</span>
+                    <input *ngIf="editMode === u.username" type="text" class="form-control" [(ngModel)]="editPassword" style="padding: 0.3rem;">
+                  </td>
+                  <td>
+                    <span *ngIf="editMode !== u.username" class="badge" [ngClass]="u.role === 'super0' ? 'badge-primary' : 'badge-secondary'">{{ u.role === 'super0' ? 'Super Admin' : 'Admin' }}</span>
+                    <select *ngIf="editMode === u.username" class="form-control" [(ngModel)]="editRole" style="padding: 0.3rem;">
+                      <option value="super0">Super Admin (super0)</option>
+                      <option value="super1">Admin (super1)</option>
+                    </select>
+                  </td>
+                  <td>
+                    <div class="flex gap-2 justify-center">
+                      <ng-container *ngIf="editMode !== u.username">
+                        <button (click)="startEdit(u)" class="btn btn-sm" style="background: rgba(14, 165, 233, 0.1); color: var(--secondary-color); padding: 0.3rem 0.6rem;">Edit</button>
+                        <button *ngIf="authService.getCurrentRole() === 'super0'" (click)="deleteUser(u.username)" class="btn btn-sm" style="background: rgba(239, 68, 68, 0.1); color: var(--danger); padding: 0.3rem 0.6rem;">Hapus</button>
+                      </ng-container>
+                      <ng-container *ngIf="editMode === u.username">
+                        <button (click)="saveEdit(u.username)" class="btn btn-sm" style="background: rgba(16, 185, 129, 0.1); color: var(--success); padding: 0.3rem 0.6rem;">Simpan</button>
+                        <button (click)="cancelEdit()" class="btn btn-sm" style="background: rgba(100, 116, 139, 0.1); color: var(--text-dark); padding: 0.3rem 0.6rem;">Batal</button>
+                      </ng-container>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div style="background: rgba(0,0,0,0.02); padding: 1rem; border-radius: var(--radius-sm); border: 1px dashed rgba(0,0,0,0.1);">
+            <h4 style="margin-bottom: 0.5rem; font-size: 0.95rem;">Tambah Admin Baru</h4>
+            <div class="flex gap-2" style="flex-wrap: wrap;">
+              <input type="text" class="form-control" placeholder="Username" [(ngModel)]="newUsername" style="flex: 1; min-width: 120px; margin-bottom: 0;">
+              <input type="password" class="form-control" placeholder="Password" [(ngModel)]="newPassword" style="flex: 1; min-width: 120px; margin-bottom: 0;">
+              <select class="form-control" [(ngModel)]="newRole" style="flex: 1; min-width: 120px; margin-bottom: 0;">
+                <option value="super1">Admin (super1)</option>
+                <option value="super0">Super Admin (super0)</option>
+              </select>
+              <button (click)="addUser()" class="btn btn-primary" style="white-space: nowrap;">+ Tambah</button>
+            </div>
           </div>
         </div>
 
@@ -66,6 +115,9 @@ import { AuthService } from '../../services/auth.service';
   styles: [`
     .flex-col { display: flex; flex-direction: column; }
     .btn { display: flex; align-items: center; justify-content: center; padding: 0.75rem 1rem; border-radius: var(--radius-sm); font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; }
+    .badge { padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; display: inline-block; text-align: center; }
+    .badge-primary { background: rgba(79, 70, 229, 0.1); color: var(--primary-color); }
+    .badge-secondary { background: rgba(100, 116, 139, 0.1); color: var(--text-dark); }
   `]
 })
 export class DatabaseComponent {
@@ -74,20 +126,68 @@ export class DatabaseComponent {
   iuranService = inject(IuranService);
   authService = inject(AuthService);
 
+  users = signal<any[]>([]);
   newUsername = '';
   newPassword = '';
+  newRole = 'super1';
+  
+  editMode: string | null = null;
+  editUsername = '';
+  editPassword = '';
+  editRole = 'super1';
 
-  changePassword() {
+  constructor() {
+    this.refreshUsers();
+  }
+
+  refreshUsers() {
+    this.users.set(this.authService.getUsers());
+  }
+
+  addUser() {
     if (!this.newUsername.trim() || !this.newPassword.trim()) {
       alert('Username dan Password tidak boleh kosong!');
       return;
     }
     
-    if (confirm('Apakah Anda yakin ingin mengubah kredensial Admin? Anda mungkin perlu login ulang setelah ini.')) {
-      this.authService.updateCredentials(this.newUsername.trim(), this.newPassword.trim());
-      alert('Username dan Password berhasil diubah!');
-      this.newUsername = '';
-      this.newPassword = '';
+    if (this.users().find(u => u.username === this.newUsername.trim())) {
+      alert('Username sudah ada! Gunakan nama lain.');
+      return;
+    }
+
+    this.authService.addUser(this.newUsername.trim(), this.newPassword.trim(), this.newRole);
+    this.newUsername = '';
+    this.newPassword = '';
+    this.newRole = 'super1';
+    this.refreshUsers();
+    alert('Admin baru berhasil ditambahkan!');
+  }
+
+  startEdit(user: any) {
+    this.editMode = user.username;
+    this.editUsername = user.username;
+    this.editPassword = user.password;
+    this.editRole = user.role || 'super0';
+  }
+
+  cancelEdit() {
+    this.editMode = null;
+  }
+
+  saveEdit(oldUsername: string) {
+    if (!this.editUsername.trim() || !this.editPassword.trim()) {
+      alert('Username dan Password tidak boleh kosong!');
+      return;
+    }
+    this.authService.updateUser(oldUsername, this.editUsername.trim(), this.editPassword.trim(), this.editRole);
+    this.editMode = null;
+    this.refreshUsers();
+  }
+
+  deleteUser(username: string) {
+    if (confirm(`Apakah Anda yakin ingin menghapus admin "${username}"?`)) {
+      this.authService.deleteUser(username);
+      this.refreshUsers();
     }
   }
 
