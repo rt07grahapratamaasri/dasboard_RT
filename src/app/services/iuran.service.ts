@@ -58,7 +58,8 @@ export class IuranService {
     this.iuranSignal.set(data);
     
     this.http.post(this.apiUrl, JSON.stringify(payload), {
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      responseType: 'text'
     }).subscribe({
       error: (err) => console.error('Gagal menyimpan Iuran', err)
     });

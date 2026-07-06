@@ -53,7 +53,8 @@ export class AuthService {
     this.usersSignal.set(users);
     
     this.http.post(this.apiUrl, JSON.stringify(payload), {
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      responseType: 'text'
     }).subscribe({
       error: (err) => console.error('Gagal menyimpan Users', err)
     });
