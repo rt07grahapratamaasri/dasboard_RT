@@ -1,4 +1,4 @@
-import { db } from './db';
+import { db } from './_db';
 
 export default async function handler(req: any, res: any) {
   const { method } = req;
