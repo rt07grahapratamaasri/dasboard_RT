@@ -75,9 +75,9 @@ import { AuthService } from '../../services/auth.service';
                   <td>
                     <div class="flex gap-2 justify-center">
                       <ng-container *ngIf="editMode !== u.username">
-                        <button *ngIf="authService.getCurrentRole().startsWith('super')" (click)="startEdit(u)" class="btn btn-sm" style="background: rgba(14, 165, 233, 0.1); color: var(--secondary-color); padding: 0.3rem 0.6rem;">Edit</button>
+                        <button *ngIf="authService.getCurrentRole() === 'super0'" (click)="startEdit(u)" class="btn btn-sm" style="background: rgba(14, 165, 233, 0.1); color: var(--secondary-color); padding: 0.3rem 0.6rem;">Edit</button>
                         <button *ngIf="authService.getCurrentRole() === 'super0'" (click)="deleteUser(u.username)" class="btn btn-sm" style="background: rgba(239, 68, 68, 0.1); color: var(--danger); padding: 0.3rem 0.6rem;">Hapus</button>
-                        <span *ngIf="!authService.getCurrentRole().startsWith('super')" class="text-muted" style="font-size: 0.8rem; font-style: italic;">Akses Terbatas</span>
+                        <span *ngIf="authService.getCurrentRole() !== 'super0'" class="text-muted" style="font-size: 0.8rem; font-style: italic;">Akses Terbatas</span>
                       </ng-container>
                       <ng-container *ngIf="editMode === u.username">
                         <button (click)="saveEdit(u.username)" class="btn btn-sm" style="background: rgba(16, 185, 129, 0.1); color: var(--success); padding: 0.3rem 0.6rem;">Simpan</button>
@@ -90,7 +90,7 @@ import { AuthService } from '../../services/auth.service';
             </table>
           </div>
 
-          <div *ngIf="authService.getCurrentRole().startsWith('super')" style="background: rgba(0,0,0,0.02); padding: 1rem; border-radius: var(--radius-sm); border: 1px dashed rgba(0,0,0,0.1);">
+          <div *ngIf="authService.getCurrentRole() === 'super0'" style="background: rgba(0,0,0,0.02); padding: 1rem; border-radius: var(--radius-sm); border: 1px dashed rgba(0,0,0,0.1);">
             <h4 style="margin-bottom: 0.5rem; font-size: 0.95rem;">Tambah Admin Baru</h4>
             <div class="flex gap-2" style="flex-wrap: wrap;">
               <input type="text" class="form-control" placeholder="Username" [(ngModel)]="newUsername" style="flex: 1; min-width: 120px; margin-bottom: 0;">
