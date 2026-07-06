@@ -135,8 +135,37 @@ import Chart from 'chart.js/auto';
           </table>
         </div>
         
-        <div *ngIf="wargaSudahBayar().length === 0" class="text-muted p-4 text-center" style="border: 2px dashed rgba(0,0,0,0.1); border-radius: var(--radius-md);">
+        <div *ngIf="wargaSudahBayar().length === 0" class="text-muted p-4 text-center" style="border: 2px dashed rgba(0,0,0,0.1); border-radius: var(--radius-md); margin-bottom: 2.5rem;">
           Belum ada warga yang lunas di bulan ini.
+        </div>
+
+        <h4 style="margin-top: 2.5rem; margin-bottom: 1rem; color: var(--text-dark);">Daftar Warga yang Belum Lunas:</h4>
+        
+        <div class="table-responsive" *ngIf="wargaBelumBayar().length > 0">
+          <table class="table" style="min-width: 400px;">
+            <thead>
+              <tr style="background: rgba(0,0,0,0.02);">
+                <th style="width: 50px;">No</th>
+                <th>Nama Warga</th>
+                <th>Blok</th>
+                <th style="text-align: center;">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let w of wargaBelumBayar(); let i = index" class="animate-fade-in" [style.animation-delay]="(i * 0.05) + 's'">
+                <td>{{ i + 1 }}</td>
+                <td style="font-weight: 500;">{{ w.nama }}</td>
+                <td>{{ w.blok }}</td>
+                <td style="text-align: center;">
+                  <span class="badge badge-danger">Belum Lunas</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        
+        <div *ngIf="wargaBelumBayar().length === 0" class="text-muted p-4 text-center" style="border: 2px dashed rgba(0,0,0,0.1); border-radius: var(--radius-md);">
+          Semua warga sudah lunas di bulan ini! 🎉
         </div>
       </div>
     </div>
@@ -156,6 +185,7 @@ import Chart from 'chart.js/auto';
       display: inline-block;
     }
     .badge-success { background: rgba(16, 185, 129, 0.1); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.2); }
+    .badge-danger { background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2); }
     
     .table-responsive {
       width: 100%;
@@ -276,6 +306,16 @@ export class KeuanganReportComponent implements AfterViewInit {
     return this.wargaService.wargaList().filter(w => {
       if (w.status !== 'Kepala Keluarga') return false;
       return !!this.iuranService.getIuranByWarga(w.id, b, t);
+    });
+  });
+
+  wargaBelumBayar = computed(() => {
+    const b = Number(this.selectedBulan());
+    const t = Number(this.selectedTahun());
+    
+    return this.wargaService.wargaList().filter(w => {
+      if (w.status !== 'Kepala Keluarga') return false;
+      return !this.iuranService.getIuranByWarga(w.id, b, t);
     });
   });
 
