@@ -1,4 +1,4 @@
-import { Pool } from '@neondatabase/serverless';
+import { Pool } from 'pg';
 
 // Do not initialize Pool if the environment variable is missing, to prevent cold boot crash
 // This allows the handler to run and return a meaningful error message
