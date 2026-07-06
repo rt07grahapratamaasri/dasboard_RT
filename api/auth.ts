@@ -12,6 +12,10 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
+    if (!db) {
+      return res.status(500).json({ error: 'Database configuration missing (DATABASE_URL/POSTGRES_URL not found)' });
+    }
+
     if (method === 'GET') {
       const { rows } = await db.query('SELECT * FROM users');
       return res.status(200).json({ data: rows });
