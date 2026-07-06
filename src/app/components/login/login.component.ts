@@ -12,7 +12,7 @@ import { NgIf } from '@angular/common';
     <div class="login-container">
       <div class="glass-panel login-box animate-fade-in">
         <div class="text-center mb-4">
-          <h2 style="color: var(--primary-color); font-weight: 700;">Login RT 07</h2>
+          <h2 style="color: var(--primary-color); font-weight: 700;">LOGIN RT 07 GRAHA PRATAMA ASRI</h2>
           <p class="text-muted" style="margin-top: 0.5rem; font-size: 0.9rem;">Masukkan kredensial Anda</p>
         </div>
         
