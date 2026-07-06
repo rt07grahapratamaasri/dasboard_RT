@@ -12,6 +12,8 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
+    if (!db) return res.status(500).json({ error: 'Database config missing' });
+
     if (method === 'GET') {
       const { rows } = await db.query('SELECT * FROM iuran');
       // Convert tinyint/boolean
