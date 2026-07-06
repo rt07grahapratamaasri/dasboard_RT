@@ -28,7 +28,7 @@ import * as XLSX from 'xlsx';
 
       <!-- Search Bar -->
       <div class="mb-4" style="margin-bottom: 1.5rem;">
-        <input type="text" class="form-control" placeholder="🔍 Cari berdasarkan NIK, Nama, atau Blok..." [(ngModel)]="searchQuery" style="max-width: 100%; width: 400px; border-radius: 20px; padding: 0.6rem 1.2rem; border: 1px solid rgba(0,0,0,0.1);">
+        <input type="text" class="form-control" placeholder="🔍 Cari berdasarkan NIK, Nama, atau Blok..." [ngModel]="searchQuery" (ngModelChange)="onSearchChange($event)" style="max-width: 100%; width: 400px; border-radius: 20px; padding: 0.6rem 1.2rem; border: 1px solid rgba(0,0,0,0.1);">
       </div>
 
       <div class="table-responsive">
@@ -46,8 +46,8 @@ import * as XLSX from 'xlsx';
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let w of filteredWarga; let i = index">
-              <td>{{ i + 1 }}</td>
+            <tr *ngFor="let w of paginatedWarga; let i = index">
+              <td>{{ (currentPage - 1) * pageSize + i + 1 }}</td>
               <td style="font-family: monospace;">{{ w.nik }}</td>
               <td style="font-weight: 500;">{{ w.nama }}</td>
               <td>{{ w.jenisKelamin }}</td>
@@ -73,6 +73,30 @@ import * as XLSX from 'xlsx';
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- Pagination Controls -->
+      <div class="flex justify-between items-center mt-4" style="flex-wrap: wrap; gap: 1rem; margin-top: 1.5rem;" *ngIf="filteredWarga.length > 0">
+        <div class="flex items-center gap-2">
+          <span class="text-muted" style="font-size: 0.9rem;">Tampilkan:</span>
+          <select class="form-control" style="width: auto; padding: 0.3rem 0.5rem; margin-bottom: 0;" [(ngModel)]="pageSize" (change)="onPageSizeChange()">
+            <option *ngFor="let size of pageSizeOptions" [value]="size">{{ size }}</option>
+          </select>
+          <span class="text-muted" style="font-size: 0.9rem;">data per halaman</span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <span class="text-muted mr-3" style="font-size: 0.9rem; margin-right: 1rem;">
+            Menampilkan {{ startItem }} - {{ endItem }} dari {{ filteredWarga.length }} data
+          </span>
+          <button class="btn btn-sm" [disabled]="currentPage === 1" (click)="changePage(currentPage - 1)" style="background: rgba(0,0,0,0.05);">Sebelumnya</button>
+          
+          <div class="flex gap-1">
+            <button class="btn btn-sm" style="background: var(--primary-color); color: white;">{{ currentPage }}</button>
+          </div>
+
+          <button class="btn btn-sm" [disabled]="currentPage === totalPages" (click)="changePage(currentPage + 1)" style="background: rgba(0,0,0,0.05);">Selanjutnya</button>
+        </div>
       </div>
 
       <!-- Import Progress Overlay -->
@@ -171,6 +195,11 @@ export class WargaListComponent {
   importProgress: number = 0;
   totalImport: number = 0;
 
+  // Pagination states
+  currentPage: number = 1;
+  pageSize: number = 10;
+  pageSizeOptions: number[] = [10, 20, 30, 40, 50, 100];
+
   get filteredWarga() {
     let result = this.wargaService.wargaList();
     const query = this.searchQuery.toLowerCase().trim();
@@ -197,6 +226,38 @@ export class WargaListComponent {
       // 3. Optional: Sort by name if both are Anggota
       return a.nama.localeCompare(b.nama);
     });
+  }
+
+  get totalPages(): number {
+    return Math.ceil(this.filteredWarga.length / this.pageSize) || 1;
+  }
+
+  get paginatedWarga() {
+    const startIndex = (this.currentPage - 1) * this.pageSize;
+    return this.filteredWarga.slice(startIndex, startIndex + this.pageSize);
+  }
+
+  get startItem(): number {
+    return this.filteredWarga.length === 0 ? 0 : (this.currentPage - 1) * this.pageSize + 1;
+  }
+  
+  get endItem(): number {
+    return Math.min(this.currentPage * this.pageSize, this.filteredWarga.length);
+  }
+
+  changePage(page: number) {
+    if (page >= 1 && page <= this.totalPages) {
+      this.currentPage = page;
+    }
+  }
+
+  onPageSizeChange() {
+    this.currentPage = 1;
+  }
+
+  onSearchChange(val: string) {
+    this.searchQuery = val;
+    this.currentPage = 1;
   }
 
   onDelete(id: string) {
