@@ -17,7 +17,7 @@ export default async function handler(req: any, res: any) {
     if (method === 'GET') {
       const { rows } = await db.query('SELECT * FROM iuran');
       // Convert tinyint/boolean
-      const mapped = rows.map(row => ({
+      const mapped = rows.map((row: any) => ({
         ...row,
         isPaid: Boolean(row.isPaid || row.ispaid) // postgres sometimes lowercases columns depending on quotes
       }));
