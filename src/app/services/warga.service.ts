@@ -1,4 +1,6 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, signal, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { environment } from '../../environments/environment';
 
 export interface Warga {
   id: string;
@@ -14,24 +16,44 @@ export interface Warga {
   providedIn: 'root'
 })
 export class WargaService {
-  private storageKey = 'rt07_warga_data';
-  private wargaListSignal = signal<Warga[]>(this.loadData());
+  private apiUrl = environment.googleSheetApiUrl;
+  private wargaListSignal = signal<Warga[]>([]);
+  private http = inject(HttpClient);
 
   wargaList = this.wargaListSignal.asReadonly();
 
-  constructor() { }
+  constructor() {
+    this.loadData();
+  }
 
-  private loadData(): Warga[] {
-    const data = localStorage.getItem(this.storageKey);
-    return data ? JSON.parse(data) : [
-      { id: '1', nik: '3201012345678901', nama: 'Budi Santoso', jenisKelamin: 'Laki-laki', agama: 'Islam', blok: 'A-01', status: 'Kepala Keluarga' },
-      { id: '2', nik: '3201012345678902', nama: 'Siti Aminah', jenisKelamin: 'Perempuan', agama: 'Islam', blok: 'A-01', status: 'Anggota' }
-    ];
+  private loadData(): void {
+    this.http.get<{data: Warga[]}>(`${this.apiUrl}?sheet=warga`).subscribe({
+      next: (res) => {
+        if (res && res.data) {
+          // Konversi ID menjadi string karena Google Sheets mungkin mengembalikannya sebagai number
+          const data = res.data.map(w => ({...w, id: String(w.id)}));
+          this.wargaListSignal.set(data);
+        }
+      },
+      error: (err) => console.error('Gagal mengambil data Warga', err)
+    });
   }
 
   private saveData(data: Warga[]): void {
-    localStorage.setItem(this.storageKey, JSON.stringify(data));
+    const payload = {
+      action: 'overwrite',
+      sheet: 'warga',
+      data: data
+    };
+    
+    // Update UI (optimistic)
     this.wargaListSignal.set(data);
+    
+    this.http.post(this.apiUrl, JSON.stringify(payload), {
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+    }).subscribe({
+      error: (err) => console.error('Gagal menyimpan Warga', err)
+    });
   }
 
   getAll(): Warga[] {

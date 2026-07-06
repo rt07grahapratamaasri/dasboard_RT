@@ -1,50 +1,72 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, signal, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { environment } from '../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
+  private apiUrl = environment.googleSheetApiUrl;
+  private http = inject(HttpClient);
+  
   private isLoggedInSignal = signal<boolean>(this.checkLogin());
+  private usersSignal = signal<any[]>([]);
 
   isLoggedIn = this.isLoggedInSignal.asReadonly();
 
-  constructor() { }
+  constructor() {
+    this.loadUsers();
+  }
+
+  private loadUsers(): void {
+    this.http.get<{data: any[]}>(`${this.apiUrl}?sheet=users`).subscribe({
+      next: (res) => {
+        if (res && res.data && res.data.length > 0) {
+          this.usersSignal.set(res.data);
+        } else {
+          // Default user if sheet is completely empty
+          const defaultUser = [{ username: 'admin', password: 'admin123', role: 'super0' }];
+          this.usersSignal.set(defaultUser);
+          this.saveUsers(defaultUser);
+        }
+      },
+      error: (err) => console.error('Gagal mengambil data Users', err)
+    });
+  }
 
   private checkLogin(): boolean {
     return localStorage.getItem('rt07_token') === 'true';
   }
 
   getUsers(): any[] {
-    const data = localStorage.getItem('rt07_users');
-    if (data) {
-      return JSON.parse(data);
-    }
-    
-    // Migration from old single-user system
-    const oldData = localStorage.getItem('rt07_admin_credentials');
-    if (oldData) {
-      const oldUser = JSON.parse(oldData);
-      const users = [{ ...oldUser, role: 'super0' }];
-      localStorage.setItem('rt07_users', JSON.stringify(users));
-      return users;
-    }
-
-    // Default
-    return [{ username: 'admin', password: 'admin123', role: 'super0' }];
+    const users = this.usersSignal();
+    return users.length > 0 ? users : [{ username: 'admin', password: 'admin123', role: 'super0' }];
   }
 
   private saveUsers(users: any[]): void {
-    localStorage.setItem('rt07_users', JSON.stringify(users));
+    const payload = {
+      action: 'overwrite',
+      sheet: 'users',
+      data: users
+    };
+    
+    this.usersSignal.set(users);
+    
+    this.http.post(this.apiUrl, JSON.stringify(payload), {
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+    }).subscribe({
+      error: (err) => console.error('Gagal menyimpan Users', err)
+    });
   }
 
   login(username: string, password: string): boolean {
     const users = this.getUsers();
-    const user = users.find(u => u.username === username && u.password === password);
+    const user = users.find(u => String(u.username) === username && String(u.password) === password);
     
     if (user) {
       localStorage.setItem('rt07_token', 'true');
-      localStorage.setItem('rt07_current_user', user.username);
-      localStorage.setItem('rt07_current_role', user.role || 'super0');
+      localStorage.setItem('rt07_current_user', String(user.username));
+      localStorage.setItem('rt07_current_role', String(user.role || 'super0'));
       this.isLoggedInSignal.set(true);
       return true;
     }
@@ -60,16 +82,16 @@ export class AuthService {
   }
 
   addUser(username: string, password: string, role: string = 'super1'): void {
-    const users = this.getUsers();
-    if (!users.find(u => u.username === username)) {
+    const users = [...this.getUsers()];
+    if (!users.find(u => String(u.username) === username)) {
       users.push({ username, password, role });
       this.saveUsers(users);
     }
   }
 
   updateUser(oldUsername: string, newUsername: string, newPassword: string, newRole: string): void {
-    const users = this.getUsers();
-    const index = users.findIndex(u => u.username === oldUsername);
+    const users = [...this.getUsers()];
+    const index = users.findIndex(u => String(u.username) === oldUsername);
     if (index !== -1) {
       users[index] = { username: newUsername, password: newPassword, role: newRole };
       this.saveUsers(users);
@@ -83,7 +105,7 @@ export class AuthService {
   }
 
   deleteUser(username: string): void {
-    let users = this.getUsers();
+    let users = [...this.getUsers()];
     if (users.length <= 1) {
       alert("Tidak dapat menghapus pengguna terakhir. Harus ada minimal 1 admin.");
       return;
@@ -92,7 +114,7 @@ export class AuthService {
       alert("Tidak dapat menghapus akun Anda sendiri saat sedang login.");
       return;
     }
-    users = users.filter(u => u.username !== username);
+    users = users.filter(u => String(u.username) !== username);
     this.saveUsers(users);
   }
 

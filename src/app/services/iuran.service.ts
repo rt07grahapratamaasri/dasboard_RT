@@ -1,5 +1,7 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { KeuanganService } from './keuangan.service';
+import { HttpClient } from '@angular/common/http';
+import { environment } from '../../environments/environment';
 
 export interface Iuran {
   id: string;
@@ -14,26 +16,56 @@ export interface Iuran {
   providedIn: 'root'
 })
 export class IuranService {
-  private storageKey = 'rt07_iuran_data';
-  private iuranSignal = signal<Iuran[]>(this.loadData());
+  private apiUrl = environment.googleSheetApiUrl;
+  private iuranSignal = signal<Iuran[]>([]);
   private keuanganService = inject(KeuanganService);
+  private http = inject(HttpClient);
 
   iuranList = this.iuranSignal.asReadonly();
 
-  constructor() { }
+  constructor() {
+    this.loadData();
+  }
 
-  private loadData(): Iuran[] {
-    const data = localStorage.getItem(this.storageKey);
-    return data ? JSON.parse(data) : [];
+  private loadData(): void {
+    this.http.get<{data: Iuran[]}>(`${this.apiUrl}?sheet=iuran`).subscribe({
+      next: (res) => {
+        if (res && res.data) {
+          const data = res.data.map(i => ({
+            ...i, 
+            id: String(i.id), 
+            wargaId: String(i.wargaId),
+            bulan: Number(i.bulan),
+            tahun: Number(i.tahun),
+            isPaid: Boolean(i.isPaid === true || i.isPaid === 'true'),
+            nominal: Number(i.nominal)
+          }));
+          this.iuranSignal.set(data);
+        }
+      },
+      error: (err) => console.error('Gagal mengambil data Iuran', err)
+    });
   }
 
   private saveData(data: Iuran[]): void {
-    localStorage.setItem(this.storageKey, JSON.stringify(data));
+    const payload = {
+      action: 'overwrite',
+      sheet: 'iuran',
+      data: data
+    };
+    
+    // Update UI (optimistic)
     this.iuranSignal.set(data);
+    
+    this.http.post(this.apiUrl, JSON.stringify(payload), {
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+    }).subscribe({
+      error: (err) => console.error('Gagal menyimpan Iuran', err)
+    });
   }
 
   getIuranByWarga(wargaId: string, bulan: number, tahun: number): Iuran | undefined {
-    return this.iuranSignal().find(i => i.wargaId === wargaId && i.bulan === bulan && i.tahun === tahun);
+    return this.iuranSignal().find(i => String(i.wargaId) === String(wargaId) && Number(i.bulan) === Number(bulan) && Number(i.tahun) === Number(tahun));
   }
 
   markAsPaid(wargaId: string, wargaName: string, bulan: number, tahun: number, nominal: number = 30000): void {

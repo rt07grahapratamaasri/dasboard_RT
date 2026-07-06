@@ -1,4 +1,6 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, signal, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { environment } from '../../environments/environment';
 
 export interface TransaksiKeuangan {
   id: string;
@@ -12,24 +14,43 @@ export interface TransaksiKeuangan {
   providedIn: 'root'
 })
 export class KeuanganService {
-  private storageKey = 'rt07_keuangan_data';
-  private transaksiSignal = signal<TransaksiKeuangan[]>(this.loadData());
+  private apiUrl = environment.googleSheetApiUrl;
+  private transaksiSignal = signal<TransaksiKeuangan[]>([]);
+  private http = inject(HttpClient);
 
   transaksiList = this.transaksiSignal.asReadonly();
 
-  constructor() { }
+  constructor() {
+    this.loadData();
+  }
 
-  private loadData(): TransaksiKeuangan[] {
-    const data = localStorage.getItem(this.storageKey);
-    return data ? JSON.parse(data) : [
-      { id: '1', tanggal: '2026-07-01', keterangan: 'Iuran Bulanan Warga', tipe: 'Pemasukan', nominal: 1500000 },
-      { id: '2', tanggal: '2026-07-02', keterangan: 'Bayar Listrik Pos Satpam', tipe: 'Pengeluaran', nominal: 350000 }
-    ];
+  private loadData(): void {
+    this.http.get<{data: TransaksiKeuangan[]}>(`${this.apiUrl}?sheet=keuangan`).subscribe({
+      next: (res) => {
+        if (res && res.data) {
+          const data = res.data.map(k => ({...k, id: String(k.id), nominal: Number(k.nominal)}));
+          this.transaksiSignal.set(data);
+        }
+      },
+      error: (err) => console.error('Gagal mengambil data Keuangan', err)
+    });
   }
 
   private saveData(data: TransaksiKeuangan[]): void {
-    localStorage.setItem(this.storageKey, JSON.stringify(data));
+    const payload = {
+      action: 'overwrite',
+      sheet: 'keuangan',
+      data: data
+    };
+    
+    // Update UI (optimistic)
     this.transaksiSignal.set(data);
+    
+    this.http.post(this.apiUrl, JSON.stringify(payload), {
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+    }).subscribe({
+      error: (err) => console.error('Gagal menyimpan Keuangan', err)
+    });
   }
 
   getAll(): TransaksiKeuangan[] {
@@ -57,7 +78,7 @@ export class KeuanganService {
 
   getTotalSaldo(): number {
     return this.transaksiSignal().reduce((acc, curr) => {
-      return curr.tipe === 'Pemasukan' ? acc + curr.nominal : acc - curr.nominal;
+      return curr.tipe === 'Pemasukan' ? acc + Number(curr.nominal) : acc - Number(curr.nominal);
     }, 0);
   }
 }
