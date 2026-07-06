@@ -61,6 +61,25 @@ export class WargaService {
     });
   }
 
+  addAsync(warga: Omit<Warga, 'id'>): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const newId = Date.now().toString();
+      const newData = { ...warga, id: newId };
+      
+      // Optimistic UI
+      this.wargaListSignal.set([...this.wargaListSignal(), newData]);
+      
+      this.http.post(this.apiUrl + '?action=addWarga', JSON.stringify(newData), { headers: { 'Content-Type': 'text/plain' } }).subscribe({
+        next: () => resolve(),
+        error: (err) => {
+          console.error('Gagal menyimpan Warga', err);
+          this.loadData(); // Revert on error
+          resolve(); // Resolve anyway so the queue continues even if one fails
+        }
+      });
+    });
+  }
+
   update(id: string, updatedWarga: Omit<Warga, 'id'>): void {
     // Optimistic UI
     const newData = this.wargaListSignal().map(w => w.id === id ? { ...updatedWarga, id } : w);

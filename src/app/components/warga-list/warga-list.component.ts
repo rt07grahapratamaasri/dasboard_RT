@@ -74,6 +74,19 @@ import * as XLSX from 'xlsx';
           </tbody>
         </table>
       </div>
+
+      <!-- Import Progress Overlay -->
+      <div *ngIf="isImporting" class="import-overlay">
+        <div class="import-card glass-panel">
+          <div class="loader"></div>
+          <h3 style="margin-top: 1rem; color: var(--primary-color);">Sedang Mengimpor Data...</h3>
+          <p style="margin-bottom: 0.5rem; font-weight: 500;">Harap jangan tutup halaman ini</p>
+          <div class="progress-text">{{ importProgress }} dari {{ totalImport }} data</div>
+          <div class="progress-bar-container">
+            <div class="progress-bar" [style.width.%]="(importProgress / totalImport) * 100"></div>
+          </div>
+        </div>
+      </div>
     </div>
   `,
   styles: [`
@@ -97,11 +110,66 @@ import * as XLSX from 'xlsx';
       font-size: 0.8rem;
       border-radius: var(--radius-sm);
     }
+    .import-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+    .import-card {
+      background: white;
+      padding: 2.5rem;
+      border-radius: 20px;
+      text-align: center;
+      max-width: 400px;
+      width: 90%;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    }
+    .loader {
+      border: 5px solid rgba(79, 70, 229, 0.2);
+      border-top: 5px solid var(--primary-color);
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .progress-bar-container {
+      width: 100%;
+      height: 8px;
+      background: #eee;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+    .progress-bar {
+      height: 100%;
+      background: var(--primary-color);
+      transition: width 0.3s ease;
+    }
+    .progress-text {
+      font-size: 0.9rem;
+      color: #666;
+    }
   `]
 })
 export class WargaListComponent {
   wargaService = inject(WargaService);
   searchQuery: string = '';
+  isImporting: boolean = false;
+  importProgress: number = 0;
+  totalImport: number = 0;
 
   get filteredWarga() {
     let result = this.wargaService.wargaList();
@@ -150,6 +218,10 @@ export class WargaListComponent {
   onFileChange(evt: any) {
     const target: DataTransfer = <DataTransfer>(evt.target);
     if (target.files.length !== 1) throw new Error('Cannot use multiple files');
+    
+    this.isImporting = true;
+    this.importProgress = 0;
+    
     const reader: FileReader = new FileReader();
     reader.onload = (e: any) => {
       const bstr: string = e.target.result;
@@ -158,12 +230,21 @@ export class WargaListComponent {
       const ws: XLSX.WorkSheet = wb.Sheets[wsname];
       const data = XLSX.utils.sheet_to_json(ws);
       
-      // Map and save data sequentially to avoid Google Apps Script concurrency limits
+      const validData = data.filter((row: any) => row.NIK && row.Nama && row.Blok && row.Status);
+      this.totalImport = validData.length;
+      
+      if (this.totalImport === 0) {
+        this.isImporting = false;
+        alert('Tidak ada data yang valid untuk diimport!');
+        return;
+      }
+
+      // Map and save data sequentially and await true network response
       const processImports = async () => {
         let successCount = 0;
-        for (const row of data) {
-          if (row.NIK && row.Nama && row.Blok && row.Status) {
-            this.wargaService.add({
+        for (const row of validData as any[]) {
+          try {
+            await this.wargaService.addAsync({
               nik: String(row.NIK),
               nama: row.Nama,
               jenisKelamin: row['Jenis Kelamin'] || 'Laki-laki',
@@ -172,10 +253,14 @@ export class WargaListComponent {
               status: row.Status === 'Kepala Keluarga' ? 'Kepala Keluarga' : 'Anggota'
             });
             successCount++;
-            // Wait 600ms between each save to ensure Google Sheets has time to appendRow safely
-            await new Promise(resolve => setTimeout(resolve, 600)); 
+            this.importProgress = successCount;
+            // Small safety buffer
+            await new Promise(resolve => setTimeout(resolve, 300)); 
+          } catch(e) {
+            console.error(e);
           }
         }
+        this.isImporting = false;
         alert(`Import data selesai! Total ${successCount} data berhasil diproses.`);
       };
       
