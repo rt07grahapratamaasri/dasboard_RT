@@ -16,7 +16,7 @@ export interface Iuran {
   providedIn: 'root'
 })
 export class IuranService {
-  private apiUrl = environment.apiUrl + '/iuran';
+  private apiUrl = environment.apiUrl;
   private iuranSignal = signal<Iuran[]>([]);
   private keuanganService = inject(KeuanganService);
   private http = inject(HttpClient);
@@ -28,7 +28,7 @@ export class IuranService {
   }
 
   private loadData(): void {
-    this.http.get<{data: Iuran[]}>(this.apiUrl).subscribe({
+    this.http.get<{data: Iuran[]}>(this.apiUrl + '?action=getIuran').subscribe({
       next: (res) => {
         if (res && res.data) {
           const data = res.data.map(i => ({
@@ -37,7 +37,7 @@ export class IuranService {
             wargaId: String(i.wargaId),
             bulan: Number(i.bulan),
             tahun: Number(i.tahun),
-            isPaid: Boolean(i.isPaid),
+            isPaid: Boolean(i.isPaid || String(i.isPaid) === 'true'),
             nominal: Number(i.nominal)
           }));
           this.iuranSignal.set(data);
@@ -66,7 +66,7 @@ export class IuranService {
       // Optimistic UI
       this.iuranSignal.set([...this.iuranSignal(), newIuran]);
       
-      this.http.post(this.apiUrl, newIuran).subscribe({
+      this.http.post(this.apiUrl + '?action=addIuran', JSON.stringify(newIuran), { headers: { 'Content-Type': 'text/plain' } }).subscribe({
         error: (err) => {
           console.error('Gagal menyimpan Iuran', err);
           this.loadData();
@@ -98,7 +98,7 @@ export class IuranService {
       const newData = this.iuranSignal().filter(i => i.id !== iuran.id);
       this.iuranSignal.set(newData);
       
-      this.http.delete(`${this.apiUrl}?id=${iuran.id}`).subscribe({
+      this.http.post(this.apiUrl + '?action=deleteIuran', JSON.stringify({id: iuran.id}), { headers: { 'Content-Type': 'text/plain' } }).subscribe({
         error: (err) => {
           console.error('Gagal hapus Iuran', err);
           this.loadData();

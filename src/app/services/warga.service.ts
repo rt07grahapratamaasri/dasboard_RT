@@ -16,7 +16,7 @@ export interface Warga {
   providedIn: 'root'
 })
 export class WargaService {
-  private apiUrl = environment.apiUrl + '/warga';
+  private apiUrl = environment.apiUrl;
   private wargaListSignal = signal<Warga[]>([]);
   private http = inject(HttpClient);
 
@@ -27,7 +27,7 @@ export class WargaService {
   }
 
   private loadData(): void {
-    this.http.get<{data: Warga[]}>(this.apiUrl).subscribe({
+    this.http.get<{data: Warga[]}>(this.apiUrl + '?action=getWarga').subscribe({
       next: (res) => {
         if (res && res.data) {
           const data = res.data.map(w => ({...w, id: String(w.id)}));
@@ -53,7 +53,7 @@ export class WargaService {
     // Optimistic UI
     this.wargaListSignal.set([...this.wargaListSignal(), newData]);
     
-    this.http.post(this.apiUrl, newData).subscribe({
+    this.http.post(this.apiUrl + '?action=addWarga', JSON.stringify(newData), { headers: { 'Content-Type': 'text/plain' } }).subscribe({
       error: (err) => {
         console.error('Gagal menyimpan Warga', err);
         this.loadData(); // Revert on error
@@ -66,7 +66,7 @@ export class WargaService {
     const newData = this.wargaListSignal().map(w => w.id === id ? { ...updatedWarga, id } : w);
     this.wargaListSignal.set(newData);
     
-    this.http.put(`${this.apiUrl}?id=${id}`, { ...updatedWarga, id }).subscribe({
+    this.http.post(this.apiUrl + '?action=updateWarga', JSON.stringify({ ...updatedWarga, id }), { headers: { 'Content-Type': 'text/plain' } }).subscribe({
       error: (err) => {
         console.error('Gagal update Warga', err);
         this.loadData();
@@ -79,7 +79,7 @@ export class WargaService {
     const newData = this.wargaListSignal().filter(w => w.id !== id);
     this.wargaListSignal.set(newData);
     
-    this.http.delete(`${this.apiUrl}?id=${id}`).subscribe({
+    this.http.post(this.apiUrl + '?action=deleteWarga', JSON.stringify({id}), { headers: { 'Content-Type': 'text/plain' } }).subscribe({
       error: (err) => {
         console.error('Gagal hapus Warga', err);
         this.loadData();

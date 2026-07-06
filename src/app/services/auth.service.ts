@@ -6,7 +6,7 @@ import { environment } from '../../environments/environment';
   providedIn: 'root'
 })
 export class AuthService {
-  private apiUrl = environment.apiUrl + '/auth';
+  private apiUrl = environment.apiUrl;
   private http = inject(HttpClient);
   
   private isLoggedInSignal = signal<boolean>(this.checkLogin());
@@ -19,7 +19,7 @@ export class AuthService {
   }
 
   private loadUsers(): void {
-    this.http.get<{data: any[]}>(this.apiUrl).subscribe({
+    this.http.get<{data: any[]}>(this.apiUrl + '?action=getUsers').subscribe({
       next: (res) => {
         if (res && res.data && res.data.length > 0) {
           this.usersSignal.set(res.data);
@@ -68,7 +68,7 @@ export class AuthService {
     // Optimistic UI
     this.usersSignal.set([...this.usersSignal(), payload]);
     
-    this.http.post(this.apiUrl, payload).subscribe({
+    this.http.post(this.apiUrl + '?action=addUser', JSON.stringify(payload), { headers: { 'Content-Type': 'text/plain' } }).subscribe({
       error: (err) => {
         console.error('Gagal menambah user', err);
         this.loadUsers();
@@ -83,7 +83,7 @@ export class AuthService {
     const users = this.usersSignal().map(u => String(u.username) === oldUsername ? { username: newUsername, password: newPassword, role: newRole } : u);
     this.usersSignal.set(users);
     
-    this.http.put(`${this.apiUrl}?username=${oldUsername}`, payload).subscribe({
+    this.http.post(this.apiUrl + '?action=updateUser', JSON.stringify(payload), { headers: { 'Content-Type': 'text/plain' } }).subscribe({
       error: (err) => {
         console.error('Gagal update user', err);
         this.loadUsers();
@@ -111,7 +111,7 @@ export class AuthService {
     // Optimistic UI
     this.usersSignal.set(users.filter(u => String(u.username) !== username));
     
-    this.http.delete(`${this.apiUrl}?username=${username}`).subscribe({
+    this.http.post(this.apiUrl + '?action=deleteUser', JSON.stringify({username}), { headers: { 'Content-Type': 'text/plain' } }).subscribe({
       error: (err) => {
         console.error('Gagal hapus user', err);
         this.loadUsers();
