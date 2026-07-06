@@ -158,20 +158,28 @@ export class WargaListComponent {
       const ws: XLSX.WorkSheet = wb.Sheets[wsname];
       const data = XLSX.utils.sheet_to_json(ws);
       
-      // Map and save data
-      data.forEach((row: any) => {
-        if (row.NIK && row.Nama && row.Blok && row.Status) {
-          this.wargaService.add({
-            nik: String(row.NIK),
-            nama: row.Nama,
-            jenisKelamin: row['Jenis Kelamin'] || 'Laki-laki',
-            agama: row.Agama || 'Islam',
-            blok: row.Blok,
-            status: row.Status === 'Kepala Keluarga' ? 'Kepala Keluarga' : 'Anggota'
-          });
+      // Map and save data sequentially to avoid Google Apps Script concurrency limits
+      const processImports = async () => {
+        let successCount = 0;
+        for (const row of data) {
+          if (row.NIK && row.Nama && row.Blok && row.Status) {
+            this.wargaService.add({
+              nik: String(row.NIK),
+              nama: row.Nama,
+              jenisKelamin: row['Jenis Kelamin'] || 'Laki-laki',
+              agama: row.Agama || 'Islam',
+              blok: row.Blok,
+              status: row.Status === 'Kepala Keluarga' ? 'Kepala Keluarga' : 'Anggota'
+            });
+            successCount++;
+            // Wait 600ms between each save to ensure Google Sheets has time to appendRow safely
+            await new Promise(resolve => setTimeout(resolve, 600)); 
+          }
         }
-      });
-      alert('Import data warga berhasil!');
+        alert(`Import data selesai! Total ${successCount} data berhasil diproses.`);
+      };
+      
+      processImports();
     };
     reader.readAsBinaryString(target.files[0]);
     // Reset file input
