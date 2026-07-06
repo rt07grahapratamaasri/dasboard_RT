@@ -16,7 +16,7 @@ export interface Warga {
   providedIn: 'root'
 })
 export class WargaService {
-  private apiUrl = environment.googleSheetApiUrl;
+  private apiUrl = environment.apiUrl + '/warga';
   private wargaListSignal = signal<Warga[]>([]);
   private http = inject(HttpClient);
 
@@ -27,33 +27,14 @@ export class WargaService {
   }
 
   private loadData(): void {
-    this.http.get<{data: Warga[]}>(`${this.apiUrl}?sheet=warga`).subscribe({
+    this.http.get<{data: Warga[]}>(this.apiUrl).subscribe({
       next: (res) => {
         if (res && res.data) {
-          // Konversi ID menjadi string karena Google Sheets mungkin mengembalikannya sebagai number
           const data = res.data.map(w => ({...w, id: String(w.id)}));
           this.wargaListSignal.set(data);
         }
       },
       error: (err) => console.error('Gagal mengambil data Warga', err)
-    });
-  }
-
-  private saveData(data: Warga[]): void {
-    const payload = {
-      action: 'overwrite',
-      sheet: 'warga',
-      data: data
-    };
-    
-    // Update UI (optimistic)
-    this.wargaListSignal.set(data);
-    
-    this.http.post(this.apiUrl, JSON.stringify(payload), {
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      responseType: 'text'
-    }).subscribe({
-      error: (err) => console.error('Gagal menyimpan Warga', err)
     });
   }
 
@@ -66,17 +47,43 @@ export class WargaService {
   }
 
   add(warga: Omit<Warga, 'id'>): void {
-    const newData = [...this.wargaListSignal(), { ...warga, id: Date.now().toString() }];
-    this.saveData(newData);
+    const newId = Date.now().toString();
+    const newData = { ...warga, id: newId };
+    
+    // Optimistic UI
+    this.wargaListSignal.set([...this.wargaListSignal(), newData]);
+    
+    this.http.post(this.apiUrl, newData).subscribe({
+      error: (err) => {
+        console.error('Gagal menyimpan Warga', err);
+        this.loadData(); // Revert on error
+      }
+    });
   }
 
   update(id: string, updatedWarga: Omit<Warga, 'id'>): void {
+    // Optimistic UI
     const newData = this.wargaListSignal().map(w => w.id === id ? { ...updatedWarga, id } : w);
-    this.saveData(newData);
+    this.wargaListSignal.set(newData);
+    
+    this.http.put(`${this.apiUrl}?id=${id}`, { ...updatedWarga, id }).subscribe({
+      error: (err) => {
+        console.error('Gagal update Warga', err);
+        this.loadData();
+      }
+    });
   }
 
   delete(id: string): void {
+    // Optimistic UI
     const newData = this.wargaListSignal().filter(w => w.id !== id);
-    this.saveData(newData);
+    this.wargaListSignal.set(newData);
+    
+    this.http.delete(`${this.apiUrl}?id=${id}`).subscribe({
+      error: (err) => {
+        console.error('Gagal hapus Warga', err);
+        this.loadData();
+      }
+    });
   }
 }

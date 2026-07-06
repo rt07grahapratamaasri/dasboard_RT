@@ -16,7 +16,7 @@ export interface Iuran {
   providedIn: 'root'
 })
 export class IuranService {
-  private apiUrl = environment.googleSheetApiUrl;
+  private apiUrl = environment.apiUrl + '/iuran';
   private iuranSignal = signal<Iuran[]>([]);
   private keuanganService = inject(KeuanganService);
   private http = inject(HttpClient);
@@ -28,7 +28,7 @@ export class IuranService {
   }
 
   private loadData(): void {
-    this.http.get<{data: Iuran[]}>(`${this.apiUrl}?sheet=iuran`).subscribe({
+    this.http.get<{data: Iuran[]}>(this.apiUrl).subscribe({
       next: (res) => {
         if (res && res.data) {
           const data = res.data.map(i => ({
@@ -37,31 +37,13 @@ export class IuranService {
             wargaId: String(i.wargaId),
             bulan: Number(i.bulan),
             tahun: Number(i.tahun),
-            isPaid: Boolean(i.isPaid === true || i.isPaid === 'true'),
+            isPaid: Boolean(i.isPaid),
             nominal: Number(i.nominal)
           }));
           this.iuranSignal.set(data);
         }
       },
       error: (err) => console.error('Gagal mengambil data Iuran', err)
-    });
-  }
-
-  private saveData(data: Iuran[]): void {
-    const payload = {
-      action: 'overwrite',
-      sheet: 'iuran',
-      data: data
-    };
-    
-    // Update UI (optimistic)
-    this.iuranSignal.set(data);
-    
-    this.http.post(this.apiUrl, JSON.stringify(payload), {
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      responseType: 'text'
-    }).subscribe({
-      error: (err) => console.error('Gagal menyimpan Iuran', err)
     });
   }
 
@@ -80,8 +62,16 @@ export class IuranService {
         isPaid: true,
         nominal
       };
-      const newData = [...this.iuranSignal(), newIuran];
-      this.saveData(newData);
+      
+      // Optimistic UI
+      this.iuranSignal.set([...this.iuranSignal(), newIuran]);
+      
+      this.http.post(this.apiUrl, newIuran).subscribe({
+        error: (err) => {
+          console.error('Gagal menyimpan Iuran', err);
+          this.loadData();
+        }
+      });
 
       // Auto add/update to Keuangan
       const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
@@ -104,8 +94,16 @@ export class IuranService {
   markAsUnpaid(wargaId: string, bulan: number, tahun: number): void {
     const iuran = this.getIuranByWarga(wargaId, bulan, tahun);
     if (iuran) {
+      // Optimistic UI
       const newData = this.iuranSignal().filter(i => i.id !== iuran.id);
-      this.saveData(newData);
+      this.iuranSignal.set(newData);
+      
+      this.http.delete(`${this.apiUrl}?id=${iuran.id}`).subscribe({
+        error: (err) => {
+          console.error('Gagal hapus Iuran', err);
+          this.loadData();
+        }
+      });
 
       // Update Keuangan
       const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];

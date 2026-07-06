@@ -6,7 +6,7 @@ import { environment } from '../../environments/environment';
   providedIn: 'root'
 })
 export class AuthService {
-  private apiUrl = environment.googleSheetApiUrl;
+  private apiUrl = environment.apiUrl + '/auth';
   private http = inject(HttpClient);
   
   private isLoggedInSignal = signal<boolean>(this.checkLogin());
@@ -19,15 +19,13 @@ export class AuthService {
   }
 
   private loadUsers(): void {
-    this.http.get<{data: any[]}>(`${this.apiUrl}?sheet=users`).subscribe({
+    this.http.get<{data: any[]}>(this.apiUrl).subscribe({
       next: (res) => {
         if (res && res.data && res.data.length > 0) {
           this.usersSignal.set(res.data);
         } else {
-          // Default user if sheet is completely empty
-          const defaultUser = [{ username: 'admin', password: 'admin123', role: 'super0' }];
-          this.usersSignal.set(defaultUser);
-          this.saveUsers(defaultUser);
+          // Default fallback (but should ideally exist in DB via init.sql)
+          this.usersSignal.set([{ username: 'admin', password: 'admin123', role: 'super0' }]);
         }
       },
       error: (err) => console.error('Gagal mengambil data Users', err)
@@ -41,23 +39,6 @@ export class AuthService {
   getUsers(): any[] {
     const users = this.usersSignal();
     return users.length > 0 ? users : [{ username: 'admin', password: 'admin123', role: 'super0' }];
-  }
-
-  private saveUsers(users: any[]): void {
-    const payload = {
-      action: 'overwrite',
-      sheet: 'users',
-      data: users
-    };
-    
-    this.usersSignal.set(users);
-    
-    this.http.post(this.apiUrl, JSON.stringify(payload), {
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      responseType: 'text'
-    }).subscribe({
-      error: (err) => console.error('Gagal menyimpan Users', err)
-    });
   }
 
   login(username: string, password: string): boolean {
@@ -83,30 +64,41 @@ export class AuthService {
   }
 
   addUser(username: string, password: string, role: string = 'super1'): void {
-    const users = [...this.getUsers()];
-    if (!users.find(u => String(u.username) === username)) {
-      users.push({ username, password, role });
-      this.saveUsers(users);
-    }
+    const payload = { username, password, role };
+    // Optimistic UI
+    this.usersSignal.set([...this.usersSignal(), payload]);
+    
+    this.http.post(this.apiUrl, payload).subscribe({
+      error: (err) => {
+        console.error('Gagal menambah user', err);
+        this.loadUsers();
+      }
+    });
   }
 
   updateUser(oldUsername: string, newUsername: string, newPassword: string, newRole: string): void {
-    const users = [...this.getUsers()];
-    const index = users.findIndex(u => String(u.username) === oldUsername);
-    if (index !== -1) {
-      users[index] = { username: newUsername, password: newPassword, role: newRole };
-      this.saveUsers(users);
-      
-      // Update session if they edit their own account
-      if (localStorage.getItem('rt07_current_user') === oldUsername) {
-        localStorage.setItem('rt07_current_user', newUsername);
-        localStorage.setItem('rt07_current_role', newRole);
+    const payload = { oldUsername, newUsername, password: newPassword, role: newRole };
+    
+    // Optimistic UI
+    const users = this.usersSignal().map(u => String(u.username) === oldUsername ? { username: newUsername, password: newPassword, role: newRole } : u);
+    this.usersSignal.set(users);
+    
+    this.http.put(`${this.apiUrl}?username=${oldUsername}`, payload).subscribe({
+      error: (err) => {
+        console.error('Gagal update user', err);
+        this.loadUsers();
       }
+    });
+
+    // Update session if they edit their own account
+    if (localStorage.getItem('rt07_current_user') === oldUsername) {
+      localStorage.setItem('rt07_current_user', newUsername);
+      localStorage.setItem('rt07_current_role', newRole);
     }
   }
 
   deleteUser(username: string): void {
-    let users = [...this.getUsers()];
+    const users = this.getUsers();
     if (users.length <= 1) {
       alert("Tidak dapat menghapus pengguna terakhir. Harus ada minimal 1 admin.");
       return;
@@ -115,8 +107,16 @@ export class AuthService {
       alert("Tidak dapat menghapus akun Anda sendiri saat sedang login.");
       return;
     }
-    users = users.filter(u => String(u.username) !== username);
-    this.saveUsers(users);
+    
+    // Optimistic UI
+    this.usersSignal.set(users.filter(u => String(u.username) !== username));
+    
+    this.http.delete(`${this.apiUrl}?username=${username}`).subscribe({
+      error: (err) => {
+        console.error('Gagal hapus user', err);
+        this.loadUsers();
+      }
+    });
   }
 
   logout(): void {

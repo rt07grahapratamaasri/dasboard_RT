@@ -14,7 +14,7 @@ export interface TransaksiKeuangan {
   providedIn: 'root'
 })
 export class KeuanganService {
-  private apiUrl = environment.googleSheetApiUrl;
+  private apiUrl = environment.apiUrl + '/keuangan';
   private transaksiSignal = signal<TransaksiKeuangan[]>([]);
   private http = inject(HttpClient);
 
@@ -25,32 +25,19 @@ export class KeuanganService {
   }
 
   private loadData(): void {
-    this.http.get<{data: TransaksiKeuangan[]}>(`${this.apiUrl}?sheet=keuangan`).subscribe({
+    this.http.get<{data: TransaksiKeuangan[]}>(this.apiUrl).subscribe({
       next: (res) => {
         if (res && res.data) {
-          const data = res.data.map(k => ({...k, id: String(k.id), nominal: Number(k.nominal)}));
+          const data = res.data.map(k => ({
+            ...k, 
+            id: String(k.id), 
+            nominal: Number(k.nominal),
+            tanggal: new Date(k.tanggal).toISOString().split('T')[0] // format date for input
+          }));
           this.transaksiSignal.set(data);
         }
       },
       error: (err) => console.error('Gagal mengambil data Keuangan', err)
-    });
-  }
-
-  private saveData(data: TransaksiKeuangan[]): void {
-    const payload = {
-      action: 'overwrite',
-      sheet: 'keuangan',
-      data: data
-    };
-    
-    // Update UI (optimistic)
-    this.transaksiSignal.set(data);
-    
-    this.http.post(this.apiUrl, JSON.stringify(payload), {
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      responseType: 'text'
-    }).subscribe({
-      error: (err) => console.error('Gagal menyimpan Keuangan', err)
     });
   }
 
@@ -59,13 +46,31 @@ export class KeuanganService {
   }
 
   add(transaksi: Omit<TransaksiKeuangan, 'id'>): void {
-    const newData = [...this.transaksiSignal(), { ...transaksi, id: Date.now().toString() }];
-    this.saveData(newData);
+    const newId = Date.now().toString();
+    const newData = { ...transaksi, id: newId };
+    
+    // Optimistic UI
+    this.transaksiSignal.set([...this.transaksiSignal(), newData]);
+    
+    this.http.post(this.apiUrl, newData).subscribe({
+      error: (err) => {
+        console.error('Gagal menyimpan Keuangan', err);
+        this.loadData();
+      }
+    });
   }
 
   update(id: string, updatedData: Partial<TransaksiKeuangan>): void {
-    const newData = this.transaksiSignal().map(t => t.id === id ? { ...t, ...updatedData } : t);
-    this.saveData(newData);
+    // Optimistic UI
+    const newData = this.transaksiSignal().map(t => t.id === id ? { ...t, ...updatedData } as TransaksiKeuangan : t);
+    this.transaksiSignal.set(newData);
+    
+    this.http.put(`${this.apiUrl}?id=${id}`, updatedData).subscribe({
+      error: (err) => {
+        console.error('Gagal update Keuangan', err);
+        this.loadData();
+      }
+    });
   }
 
   findByKeterangan(keterangan: string): TransaksiKeuangan | undefined {
@@ -73,8 +78,16 @@ export class KeuanganService {
   }
 
   delete(id: string): void {
+    // Optimistic UI
     const newData = this.transaksiSignal().filter(t => t.id !== id);
-    this.saveData(newData);
+    this.transaksiSignal.set(newData);
+    
+    this.http.delete(`${this.apiUrl}?id=${id}`).subscribe({
+      error: (err) => {
+        console.error('Gagal hapus Keuangan', err);
+        this.loadData();
+      }
+    });
   }
 
   getTotalSaldo(): number {
